@@ -5,6 +5,10 @@ from __future__ import annotations
 from typing import Any
 import numpy as np
 
+from robomme.software_render import enable_if_needed
+
+enable_if_needed()  # must run before the imports below pull in SAPIEN
+
 from robomme.robomme_env import *  # noqa: F401, F403 - env registration
 from robomme.env_record_wrapper import BenchmarkEnvBuilder
 

@@ -130,6 +130,7 @@ class HistoryBlock(nn.Module):
         mem_seq,
         mem_mask,
         deterministic=True,
+        memory_enabled=True,
     ):  # noqa: FBT002
 
         if self.integration_type == "modulation":
@@ -176,7 +177,10 @@ class HistoryBlock(nn.Module):
                 # Add Memory Modulation before FFN
                 if i == len(xs) - 1 and self.integration_type == "modulation":
                     mem_mod_vec = mem_attn(x, mem_seq[-1], mem_mask[-1])
-                    x = MemoryRMSNorm(name="mem_rms_norm_ffn")(x, mem_mod_vec)  
+                    modulated = MemoryRMSNorm(name="mem_rms_norm_ffn")(x, mem_mod_vec)
+                    # A true intervention bypasses the extra normalization too.
+                    # Keep parameter names/shapes identical for released checkpoints.
+                    x = jnp.where(memory_enabled, modulated, x)
                 
                 name=_name("pre_ffw_norm", i) if self.integration_type != "expert" else _name("pre_ffw_norm", i-1)
                 x, gate = RMSNorm(name=name)(
@@ -250,7 +254,8 @@ class Module(nn.Module):
                 nn.broadcast,
                 nn.broadcast,
                 nn.broadcast,
-            ),  # 0=kv_cache, 1=positions, 2=mask, 3=adarms_cond, 4=mem_seq, 5=mem_mask, 6=deterministic
+                nn.broadcast,
+            ),  # kv_cache, positions, mask, adarms_cond, mem_seq, mem_mask, deterministic, memory_enabled
             length=self.configs[0].depth,
         )(
             configs=self.configs,
@@ -279,6 +284,7 @@ class Module(nn.Module):
         mem_seq: Sequence[at.Float[at.Array, "b lmem _d"] | None] | None = None,
         mem_mask: Sequence[at.Bool[at.Array, "b lmem"] | None] | None = None,
         deterministic: bool = True,
+        memory_enabled: bool | at.Bool[at.Array, ""] = True,
     ) -> tuple[Sequence[at.Float[at.Array, "b _t _d"] | None], KVCache]:
         embedded = jax.tree.map(lambda e: e.astype(self.embed_dtype), embedded)
         mask = jnp.asarray(mask)[:, None, :, :]
@@ -294,6 +300,7 @@ class Module(nn.Module):
             mem_seq,
             mem_mask,
             deterministic,
+            memory_enabled,
         )
 
         assert all(

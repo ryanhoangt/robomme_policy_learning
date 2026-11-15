@@ -645,6 +645,7 @@ class HistoryPi0(BaseModel):
         *,
         num_steps: int | at.Int[at.Array, ""] = 10,
         noise: at.Float[at.Array, "b ah ad"] | None = None,
+        memory_enabled: bool = True,
     ) -> Actions:
 
         observation = preprocess_observation(None, observation, train=False)
@@ -744,6 +745,7 @@ class HistoryPi0(BaseModel):
                     adarms_cond=[None, adarms_cond],
                     mem_seq=[None, mem_seq],
                     mem_mask=[None, mem_mask],
+                    memory_enabled=memory_enabled,
                 )
             else:
                 (prefix_out, suffix_out), _ = self.PaliGemma.llm(
